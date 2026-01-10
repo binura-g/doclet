@@ -2,6 +2,7 @@ package collab
 
 import (
 	"encoding/json"
+	"hash/fnv"
 	"log"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ const (
 	messageUpdate   = "yjs_update"
 	messageSnapshot = "yjs_snapshot"
 	messagePresence = "presence"
+	messageUserName = "user_name"
 )
 
 type Server struct {
@@ -61,6 +63,14 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	log.Printf("client %s joined %s", clientID, documentID)
 
 	go client.WritePump()
+	s.sendUserNameToClient(client, client.clientID)
+	for _, otherID := range s.hub.ClientIDs(documentID) {
+		if otherID == client.clientID {
+			continue
+		}
+		s.sendUserNameToClient(client, otherID)
+	}
+	s.broadcastUserName(client)
 	client.ReadPump(func(msg Message) {
 		s.handleClientMessage(client, msg)
 	})
@@ -95,6 +105,31 @@ func (s *Server) handleClientMessage(client *Client, msg Message) {
 	}
 }
 
+func (s *Server) sendUserName(client *Client) {
+	s.sendUserNameToClient(client, client.clientID)
+}
+
+func (s *Server) sendUserNameToClient(client *Client, targetID string) {
+	payload, err := json.Marshal(userNameMessage(client.documentID, targetID))
+	if err != nil {
+		log.Printf("user_name marshal error: %v", err)
+		return
+	}
+	select {
+	case client.send <- payload:
+	default:
+		log.Printf("user_name send dropped for %s", client.clientID)
+	}
+}
+
+func (s *Server) broadcastUserName(client *Client) {
+	payload := mustMarshal(userNameMessage(client.documentID, client.clientID))
+	if payload == nil {
+		return
+	}
+	s.hub.Broadcast(client.documentID, payload, client.clientID)
+}
+
 func (s *Server) SubscribeNATS() error {
 	if s.broker == nil {
 		return nil
@@ -126,6 +161,33 @@ func mustMarshal(msg Message) []byte {
 		return nil
 	}
 	return payload
+}
+
+func nameForClient(clientID string) string {
+	adjectives := []string{
+		"Brisk", "Calm", "Clever", "Golden", "Mellow",
+		"Quick", "Quiet", "Sharp", "Sunny", "Witty",
+	}
+	nouns := []string{
+		"Comet", "Falcon", "Harbor", "Lighthouse", "Meadow",
+		"Orchard", "River", "Sparrow", "Summit", "Willow",
+	}
+
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(clientID))
+	value := hash.Sum32()
+	adj := adjectives[int(value)%len(adjectives)]
+	noun := nouns[int(value>>8)%len(nouns)]
+	return adj + " " + noun
+}
+
+func userNameMessage(documentID, clientID string) Message {
+	return Message{
+		Type:       messageUserName,
+		DocumentID: documentID,
+		ClientID:   clientID,
+		Payload:    nameForClient(clientID),
+	}
 }
 
 func logRequests(next http.Handler) http.Handler {

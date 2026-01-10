@@ -91,6 +91,17 @@ func (s *Store) UpdateTitle(ctx context.Context, id uuid.UUID, title string) err
 	return nil
 }
 
+func (s *Store) DeleteDocument(ctx context.Context, id uuid.UUID) error {
+	result := s.db.WithContext(ctx).Delete(&Document{}, "document_id = ?", id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func IsNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }

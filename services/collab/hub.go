@@ -69,6 +69,20 @@ func (h *Hub) Broadcast(documentID string, payload []byte, senderID string) {
 	}
 }
 
+func (h *Hub) ClientIDs(documentID string) []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	docClients := h.clients[documentID]
+	if docClients == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(docClients))
+	for id := range docClients {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func (c *Client) ReadPump(handle func(Message)) {
 	defer func() {
 		c.conn.Close()

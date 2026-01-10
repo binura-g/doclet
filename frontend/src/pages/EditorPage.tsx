@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Collaboration from '@tiptap/extension-collaboration'
@@ -7,24 +7,27 @@ import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import Underline from '@tiptap/extension-underline'
 import LinkExtension from '@tiptap/extension-link'
 import * as Y from 'yjs'
-import { getDocument, getCollabWsUrl, updateDocumentTitle } from '../api'
+import { getDocument, getCollabWsUrl, updateDocumentTitle, deleteDocument } from '../api'
 import { DocletProvider } from '../editor/DocletProvider'
 import {
   base64ToBytes,
   colorFromSeed,
   getSessionClientId,
-  getSessionDisplayName,
 } from '../utils'
 
 export default function EditorPage() {
   const { documentId } = useParams()
+  const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleError, setTitleError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<'connected' | 'disconnected'>('disconnected')
   const [ready, setReady] = useState(false)
   const [provider, setProvider] = useState<DocletProvider | null>(null)
-  const [userName] = useState(getSessionDisplayName())
+  const [userName, setUserName] = useState('Anonymous')
+  const [userNames, setUserNames] = useState<Record<string, string>>({})
   const [activeUsers, setActiveUsers] = useState<Array<{ id: number; name: string }>>([])
 
   const clientId = useMemo(() => getSessionClientId(), [])
@@ -64,20 +67,41 @@ export default function EditorPage() {
     }
     const user = {
       name: userName,
-      color: colorFromSeed(userName || clientId),
+      color: colorFromSeed(userName + clientId),
     }
-    const nextProvider = new DocletProvider({
-      documentId,
-      clientId,
-      wsUrl: getCollabWsUrl(),
-      doc: ydoc,
-      user,
-    })
-    setProvider(nextProvider)
+    let cancelled = false
+    let nextProvider: DocletProvider | null = null
+
+    const connect = async () => {
+      const wsUrl = await getCollabWsUrl()
+      if (cancelled) {
+        return
+      }
+      nextProvider = new DocletProvider({
+        documentId,
+        clientId,
+        wsUrl,
+        doc: ydoc,
+        user,
+        onStatus: setStatus,
+        onUserName: (id, name) => {
+          setUserNames((prev) => ({ ...prev, [id]: name }))
+          if (id === clientId) {
+            setUserName(name || 'Anonymous')
+          }
+        },
+      })
+      setProvider(nextProvider)
+    }
+    connect()
 
     return () => {
-      nextProvider.destroy()
+      cancelled = true
+      if (nextProvider) {
+        nextProvider.destroy()
+      }
       setProvider(null)
+      setStatus('disconnected')
     }
   }, [ready, documentId, clientId, ydoc, userName])
 
@@ -87,7 +111,7 @@ export default function EditorPage() {
     }
     provider.updateUser({
       name: userName,
-      color: colorFromSeed(userName || clientId),
+      color: colorFromSeed(userName + clientId),
     })
   }, [provider, userName, clientId])
 
@@ -102,7 +126,9 @@ export default function EditorPage() {
         if (id === selfId) {
           return
         }
-        const name = state?.user?.name || 'Anonymous'
+        const nameFromState = state?.user?.name
+        const clientIdFromState = state?.user?.clientId
+        const name = nameFromState || userNames[clientIdFromState] || 'Anonymous'
         users.push({ id, name })
       })
       setActiveUsers(users)
@@ -112,7 +138,7 @@ export default function EditorPage() {
     return () => {
       provider.awareness.off('update', updateUsers)
     }
-  }, [provider])
+  }, [provider, userNames])
 
   const editor = useEditor(
     provider
@@ -128,16 +154,21 @@ export default function EditorPage() {
               const cursor = document.createElement('span')
               cursor.classList.add('doclet-cursor')
               const displayName = typeof user.name === 'string' ? user.name : ''
+              const clientIdFromState = typeof user.clientId === 'string' ? user.clientId : ''
+              const mappedName = clientIdFromState ? userNames[clientIdFromState] : ''
               const fallbackId = typeof user.id === 'string' ? user.id : 'user'
-              const color = user.color || colorFromSeed(displayName || fallbackId)
+              const label = displayName || mappedName || 'Anonymous'
+              const seed = label || fallbackId
+              const color = colorFromSeed(seed)
               cursor.style.borderColor = color
 
-              const label = document.createElement('span')
-              label.classList.add('doclet-cursor-label')
-              label.style.backgroundColor = color
-              label.textContent = displayName || 'Anonymous'
+              const tooltip = document.createElement('span')
+              tooltip.classList.add('doclet-cursor-label')
+              tooltip.style.setProperty('--doclet-cursor-color', color)
+              tooltip.style.backgroundColor = 'var(--doclet-cursor-color)'
+              tooltip.textContent = label
 
-              cursor.appendChild(label)
+              cursor.appendChild(tooltip)
               return cursor
             },
           }),
@@ -226,25 +257,22 @@ export default function EditorPage() {
           </div>
           <div>
             <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <span className="doclet-pill">You: {userName || 'Anonymous'}</span>
+              <span className="doclet-pill">
+                You: {userName || 'Anonymous'}
+                <span
+                  className={`h-2 w-2 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                />
+              </span>
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {activeUsers.length === 0 ? (
-                <span className="text-sm text-zinc-500">No active collaborators</span>
-              ) : (
-                <>
-                  <span className="text-sm text-zinc-500">Active:</span>
-                  {activeUsers.map((user) => (
-                    <span key={user.id} className="doclet-pill">
-                      {user.name}
-                    </span>
-                  ))}
-                </>
-              )}
+            <div className="mt-1 text-xs text-zinc-500">
+              {activeUsers.length === 0
+                ? "You're the only one here"
+                : `${activeUsers.length} other active collaborator${activeUsers.length > 1 ? 's' : ''}`}
             </div>
           </div>
         </div>
         {titleError ? <div className="text-sm text-rose-500">{titleError}</div> : null}
+        {deleteError ? <div className="text-sm text-rose-500">{deleteError}</div> : null}
 
         <div className="doclet-card p-6">
           <div className="flex flex-wrap gap-2">
@@ -316,6 +344,30 @@ export default function EditorPage() {
           >
             {editor ? <EditorContent editor={editor} /> : <div className="text-sm text-zinc-500">Loading editor…</div>}
           </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            className="doclet-button-secondary border-rose-200 text-rose-600 hover:border-rose-400 hover:text-rose-700"
+            type="button"
+            onClick={async () => {
+              if (!documentId) {
+                return
+              }
+              const confirmed = window.confirm('Delete this document? This cannot be undone.')
+              if (!confirmed) {
+                return
+              }
+              try {
+                await deleteDocument(documentId)
+                navigate('/')
+              } catch (err) {
+                setDeleteError((err as Error).message)
+              }
+            }}
+          >
+            Delete document
+          </button>
         </div>
       </div>
     </div>

@@ -61,7 +61,7 @@ export default function HomePage() {
             <div>
               <h1 className="text-4xl font-semibold tracking-tight text-zinc-900">Doclet</h1>
               <p className="mt-2 text-sm text-zinc-500">
-                Fast, anonymous collaboration on rich-text documents
+                Anonymous real-time collaboration on rich-text documents
               </p>
             </div>
           </div>
@@ -100,7 +100,7 @@ export default function HomePage() {
           </div>
           {error ? <div className="mt-3 text-sm text-rose-500">{error}</div> : null}
           {docs.length === 0 && !loading ? (
-            <div className="mt-4 text-sm text-zinc-500">No documents found.</div>
+            <div className="mt-4 text-sm text-zinc-500">No documents found. Create one to get started!</div>
           ) : null}
           <div className="mt-4 grid gap-3">
             {docs.map((doc) => (
@@ -113,8 +113,11 @@ export default function HomePage() {
                   <div className="text-sm font-semibold text-zinc-900">
                     {doc.displayName || 'Untitled'}
                   </div>
-                  <div className="text-sm text-zinc-500">
-                    Updated {new Date(doc.updated_at).toLocaleString()}
+                  <div
+                    className="text-xs text-zinc-500"
+                    title={new Date(doc.updated_at).toLocaleString()}
+                  >
+                    Updated {formatRelativeTime(doc.updated_at)}
                   </div>
                 </div>
                 <span className="text-sm font-semibold text-emerald-500">Open →</span>
@@ -125,4 +128,29 @@ export default function HomePage() {
       </div>
     </div>
   )
+}
+
+function formatRelativeTime(value: string) {
+  const updated = new Date(value).getTime()
+  if (Number.isNaN(updated)) {
+    return 'just now'
+  }
+  const diffMs = Date.now() - updated
+  const diffSeconds = Math.floor(diffMs / 1000)
+  if (diffSeconds < 60) {
+    return 'just now'
+  }
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`
+  }
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) {
+    return `${diffHours}h ago`
+  }
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) {
+    return `${diffDays}d ago`
+  }
+  return new Date(value).toLocaleDateString()
 }

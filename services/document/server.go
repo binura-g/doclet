@@ -51,7 +51,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(logRequests)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
@@ -64,6 +64,7 @@ func (s *Server) Router() http.Handler {
 		r.Get("/", s.handleListDocuments)
 		r.Get("/{document_id}", s.handleGetDocument)
 		r.Put("/{document_id}/title", s.handleUpdateTitle)
+		r.Delete("/{document_id}", s.handleDeleteDocument)
 	})
 
 	return r
@@ -170,6 +171,27 @@ func (s *Server) handleUpdateTitle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleDeleteDocument(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "document_id")
+	docID, err := uuid.Parse(idParam)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_document_id"})
+		return
+	}
+
+	if err := s.store.DeleteDocument(r.Context(), docID); err != nil {
+		if IsNotFound(err) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+			return
+		}
+		log.Printf("delete document error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "delete_failed"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func documentToResponse(doc Document) DocumentResponse {

@@ -13,6 +13,7 @@ export type ProviderOptions = {
   doc: Y.Doc
   user: { name: string; color: string }
   onStatus?: (status: 'connected' | 'disconnected') => void
+  onUserName?: (clientId: string, name: string) => void
 }
 
 type SocketMessage = {
@@ -31,6 +32,7 @@ export class DocletProvider {
   private clientId: string
   private wsUrl: string
   private onStatus?: (status: 'connected' | 'disconnected') => void
+  private onUserName?: (clientId: string, name: string) => void
   private snapshotTimer: number | null = null
 
   constructor(options: ProviderOptions) {
@@ -39,8 +41,12 @@ export class DocletProvider {
     this.clientId = options.clientId
     this.wsUrl = options.wsUrl
     this.onStatus = options.onStatus
+    this.onUserName = options.onUserName
     this.awareness = new Awareness(this.doc)
-    this.awareness.setLocalStateField('user', options.user)
+    this.awareness.setLocalStateField('user', {
+      ...options.user,
+      clientId: this.clientId,
+    })
 
     this.doc.on('update', this.handleDocUpdate)
     this.awareness.on('update', this.handleAwarenessUpdate)
@@ -48,7 +54,10 @@ export class DocletProvider {
   }
 
   updateUser(user: { name: string; color: string }) {
-    this.awareness.setLocalStateField('user', user)
+    this.awareness.setLocalStateField('user', {
+      ...user,
+      clientId: this.clientId,
+    })
   }
 
   private connect() {
@@ -77,6 +86,12 @@ export class DocletProvider {
       return
     }
     if (!msg || msg.document_id !== this.documentId) {
+      return
+    }
+    if (msg.type === 'user_name') {
+      if (msg.payload) {
+        this.onUserName?.(msg.client_id, msg.payload)
+      }
       return
     }
     if (msg.client_id === this.clientId) {

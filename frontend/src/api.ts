@@ -1,4 +1,4 @@
-const docServiceUrl = import.meta.env.VITE_DOC_SERVICE_URL || 'http://localhost:8080'
+import { loadConfig } from './config'
 
 export type DocumentListItem = {
   document_id: string
@@ -15,7 +15,8 @@ export type DocumentResponse = {
 }
 
 export async function listDocuments(query: string): Promise<DocumentListItem[]> {
-  const url = new URL(`${docServiceUrl}/documents`)
+  const config = await loadConfig()
+  const url = new URL(`${config.docServiceUrl}/documents`)
   if (query) {
     url.searchParams.set('query', query)
   }
@@ -28,7 +29,8 @@ export async function listDocuments(query: string): Promise<DocumentListItem[]> 
 }
 
 export async function createDocument(displayName: string): Promise<DocumentResponse> {
-  const res = await fetch(`${docServiceUrl}/documents`, {
+  const config = await loadConfig()
+  const res = await fetch(`${config.docServiceUrl}/documents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ displayName }),
@@ -40,7 +42,8 @@ export async function createDocument(displayName: string): Promise<DocumentRespo
 }
 
 export async function getDocument(documentId: string): Promise<DocumentResponse> {
-  const res = await fetch(`${docServiceUrl}/documents/${documentId}`)
+  const config = await loadConfig()
+  const res = await fetch(`${config.docServiceUrl}/documents/${documentId}`)
   if (!res.ok) {
     throw new Error('Document not found')
   }
@@ -48,7 +51,8 @@ export async function getDocument(documentId: string): Promise<DocumentResponse>
 }
 
 export async function updateDocumentTitle(documentId: string, displayName: string): Promise<void> {
-  const res = await fetch(`${docServiceUrl}/documents/${documentId}/title`, {
+  const config = await loadConfig()
+  const res = await fetch(`${config.docServiceUrl}/documents/${documentId}/title`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ displayName }),
@@ -58,6 +62,17 @@ export async function updateDocumentTitle(documentId: string, displayName: strin
   }
 }
 
-export function getCollabWsUrl(): string {
-  return import.meta.env.VITE_COLLAB_WS_URL || 'ws://localhost:8090/ws'
+export async function deleteDocument(documentId: string): Promise<void> {
+  const config = await loadConfig()
+  const res = await fetch(`${config.docServiceUrl}/documents/${documentId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    throw new Error('Failed to delete document')
+  }
+}
+
+export async function getCollabWsUrl(): Promise<string> {
+  const config = await loadConfig()
+  return config.collabWsUrl || 'ws://localhost:8090/ws'
 }

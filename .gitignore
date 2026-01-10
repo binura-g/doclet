@@ -31,6 +31,7 @@ go.work.sum
 node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/tsconfig.app.tsbuildinfo
 
 # Editor/IDE
 # .idea/
@@ -38,3 +39,6 @@ frontend/dist/
 
 # macOS
 .DS_Store
+
+# Air temp artifacts
+tmp/
