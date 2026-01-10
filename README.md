@@ -1,5 +1,7 @@
 # Doclet
 
+![Doclet Logo](./docs/doclet-logo.png)
+
 Anonymous real-time collaboration on rich-text documents
 
 ## Architecture overview
