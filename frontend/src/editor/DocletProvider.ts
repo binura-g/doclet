@@ -47,6 +47,10 @@ export class DocletProvider {
     this.connect()
   }
 
+  updateUser(user: { name: string; color: string }) {
+    this.awareness.setLocalStateField('user', user)
+  }
+
   private connect() {
     const url = new URL(this.wsUrl)
     url.searchParams.set('document_id', this.documentId)

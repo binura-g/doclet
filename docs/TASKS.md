@@ -69,6 +69,7 @@
 - [x] Apply remote updates into editor state.
 - [x] Emit local edits with client id and version.
 - [x] Show collaborator cursors and activity indicators.
+- [x] Allow anonymous display name with random two-word fallback.
 
 ## Milestone 5: Reliability and testing
 ### Epic: Automated testing

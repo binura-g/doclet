@@ -75,6 +75,22 @@ func (s *Store) UpdateContent(ctx context.Context, id uuid.UUID, content []byte)
 	return nil
 }
 
+func (s *Store) UpdateTitle(ctx context.Context, id uuid.UUID, title string) error {
+	result := s.db.WithContext(ctx).Model(&Document{}).
+		Where("document_id = ?", id).
+		Updates(map[string]interface{}{
+			"display_name": title,
+			"updated_at":   time.Now().UTC(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func IsNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }

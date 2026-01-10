@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -20,6 +21,10 @@ type Server struct {
 }
 
 type CreateDocumentRequest struct {
+	DisplayName string `json:"displayName"`
+}
+
+type UpdateTitleRequest struct {
 	DisplayName string `json:"displayName"`
 }
 
@@ -43,9 +48,10 @@ func NewServer(store *Store) *Server {
 
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
+	r.Use(logRequests)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
@@ -57,9 +63,19 @@ func (s *Server) Router() http.Handler {
 		r.Post("/", s.handleCreateDocument)
 		r.Get("/", s.handleListDocuments)
 		r.Get("/{document_id}", s.handleGetDocument)
+		r.Put("/{document_id}/title", s.handleUpdateTitle)
 	})
 
 	return r
+}
+
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		next.ServeHTTP(ww, r)
+		log.Printf("document %s %s %d %s", r.Method, r.URL.Path, ww.Status(), time.Since(start))
+	})
 }
 
 func (s *Server) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +139,37 @@ func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"items": items,
 	})
+}
+
+func (s *Server) handleUpdateTitle(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "document_id")
+	docID, err := uuid.Parse(idParam)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_document_id"})
+		return
+	}
+
+	var req UpdateTitleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	if req.DisplayName == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "display_name_required"})
+		return
+	}
+
+	if err := s.store.UpdateTitle(r.Context(), docID, req.DisplayName); err != nil {
+		if IsNotFound(err) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+			return
+		}
+		log.Printf("update title error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "update_failed"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func documentToResponse(doc Document) DocumentResponse {

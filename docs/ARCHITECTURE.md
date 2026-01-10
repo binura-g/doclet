@@ -11,6 +11,7 @@ Doclet uses a simple two-service backend: a document service for persistence and
 - Applies inbound updates to the editor state.
 - Renders presence (cursor and activity) for each anonymous session.
 - Uses Yjs awareness for cursors and user activity.
+- Stores a session-scoped display name or generates a random two-word name.
 
 ### Document Service (Go)
 - REST API for list/create/load document with an OpenAPI spec.
@@ -65,7 +66,7 @@ Doclet uses a simple two-service backend: a document service for persistence and
 - Connect: `/ws?document_id=<id>`
 - Messages:
   - `yjs_update`: `{ document_id, payload, client_id }` (payload is base64 Yjs update)
-  - `presence`: `{ document_id, client_id, payload }` (payload is base64 awareness update)
+  - `presence`: `{ document_id, client_id, payload }` (payload is base64 awareness update, includes user name)
   - `yjs_snapshot`: `{ document_id, payload, client_id }` (payload is base64 Yjs snapshot)
 
 ## Consistency Model

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -29,7 +30,7 @@ func (s *Server) Router() http.Handler {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("/ws", s.handleWebsocket)
-	return mux
+	return logRequests(mux)
 }
 
 func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
@@ -125,4 +126,12 @@ func mustMarshal(msg Message) []byte {
 		return nil
 	}
 	return payload
+}
+
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, r)
+		log.Printf("collab %s %s %s", r.Method, r.URL.Path, time.Since(start))
+	})
 }

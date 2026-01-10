@@ -29,10 +29,62 @@ export function getSessionClientId(): string {
   return id
 }
 
-export function colorFromClientId(clientId: string): string {
+const nameKey = 'doclet_display_name'
+const adjectives = [
+  'Brisk',
+  'Calm',
+  'Clever',
+  'Golden',
+  'Mellow',
+  'Quick',
+  'Quiet',
+  'Sharp',
+  'Sunny',
+  'Witty',
+]
+const nouns = [
+  'Comet',
+  'Falcon',
+  'Harbor',
+  'Lighthouse',
+  'Meadow',
+  'Orchard',
+  'River',
+  'Sparrow',
+  'Summit',
+  'Willow',
+]
+
+export function getSessionDisplayName(): string {
+  const existing = sessionStorage.getItem(nameKey)
+  if (existing) {
+    return existing
+  }
+  return resetSessionDisplayName()
+}
+
+export function setSessionDisplayName(name: string) {
+  if (!name) {
+    sessionStorage.removeItem(nameKey)
+    return
+  }
+  sessionStorage.setItem(nameKey, name)
+}
+
+export function resetSessionDisplayName(): string {
+  const name = `${sample(adjectives)} ${sample(nouns)}`
+  sessionStorage.setItem(nameKey, name)
+  return name
+}
+
+function sample(values: string[]) {
+  return values[Math.floor(Math.random() * values.length)]
+}
+
+export function colorFromSeed(seed: string): string {
   let hash = 0
-  for (let i = 0; i < clientId.length; i += 1) {
-    hash = clientId.charCodeAt(i) + ((hash << 5) - hash)
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash)
   }
   const hue = Math.abs(hash) % 360
   return `hsl(${hue}, 70%, 45%)`

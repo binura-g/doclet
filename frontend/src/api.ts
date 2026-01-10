@@ -47,6 +47,17 @@ export async function getDocument(documentId: string): Promise<DocumentResponse>
   return res.json()
 }
 
+export async function updateDocumentTitle(documentId: string, displayName: string): Promise<void> {
+  const res = await fetch(`${docServiceUrl}/documents/${documentId}/title`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName }),
+  })
+  if (!res.ok) {
+    throw new Error('Failed to update title')
+  }
+}
+
 export function getCollabWsUrl(): string {
   return import.meta.env.VITE_COLLAB_WS_URL || 'ws://localhost:8090/ws'
 }

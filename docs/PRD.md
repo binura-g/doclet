@@ -31,6 +31,7 @@ Doclet is a lightweight, real-time collaborative rich-text editor. Users create 
 - Rich-text features: bold, italic, underline, headings, lists, links.
 - Live presence: cursor positions and user activity are visible to all collaborators.
 - Each browser session is an anonymous user with a generated session id.
+- Users can optionally set a display name; otherwise a random two-word name is assigned.
 
 ### 3) Document Persistence
 - Store `document_id`, `displayName`, and `content` in PostgreSQL.
@@ -46,6 +47,7 @@ Doclet is a lightweight, real-time collaborative rich-text editor. Users create 
   - Home: document list with search and create.
   - Editor: display name, rich-text editor, live presence.
 - Editor uses TipTap with Yjs collaboration.
+ - Cursor tooltips show collaborator names without taking a full row.
 
 ## User Flows
 ### Home and Search
