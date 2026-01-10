@@ -14,6 +14,8 @@ System components:
 - NATS: broadcasts updates across service replicas.
 - PostgreSQL: stores document metadata and snapshots.
 
+![Component Diagram](./docs/component-diagram.png)
+
 ## Local setup
 
 ### 1) Start dependencies
