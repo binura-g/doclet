@@ -1,0 +1,5 @@
+FROM postgres:16-alpine
+ENV POSTGRES_USER=doclet
+ENV POSTGRES_PASSWORD=doclet
+ENV POSTGRES_DB=doclet
+EXPOSE 5432
