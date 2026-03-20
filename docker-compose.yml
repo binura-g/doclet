@@ -25,7 +25,7 @@ services:
       DOCLET_DATABASE_URL: "postgres://doclet:doclet@postgres:5432/doclet?sslmode=disable"
       DOCLET_NATS_URL: "nats://nats:4222"
     ports:
-      - "8080:8080"
+      - "8085:8080"
     depends_on:
       - postgres
       - nats
@@ -51,7 +51,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        VITE_DOC_SERVICE_URL: "http://document-svc:8080"
+        VITE_DOC_SERVICE_URL: "http://document-svc:8085"
         VITE_COLLAB_WS_URL: "ws://collab-svc:8090/ws"
     ports:
       - "5173:80"
