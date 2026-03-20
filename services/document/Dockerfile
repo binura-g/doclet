@@ -9,5 +9,5 @@ RUN CGO_ENABLED=0 go build -o /out/document ./cmd/document
 FROM alpine:3.19
 WORKDIR /app
 COPY --from=builder /out/document /app/document
-EXPOSE 8080
+EXPOSE 8085
 CMD ["/app/document"]

@@ -21,11 +21,11 @@ services:
       context: .
       dockerfile: services/document/Dockerfile
     environment:
-      DOCLET_DOCUMENT_ADDR: ":8080"
+      DOCLET_DOCUMENT_ADDR: ":8085"
       DOCLET_DATABASE_URL: "postgres://doclet:doclet@postgres:5432/doclet?sslmode=disable"
       DOCLET_NATS_URL: "nats://nats:4222"
     ports:
-      - "8085:8080"
+      - "8085:8085"
     depends_on:
       - postgres
       - nats
