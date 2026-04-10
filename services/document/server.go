@@ -49,22 +49,23 @@ func NewServer(store *Store) *Server {
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(logRequests)
+	r.Use(newTraceMiddleware("document.http"))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
-	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	r.Get("/healthz", traceRoute("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 
 	r.Route("/documents", func(r chi.Router) {
-		r.Post("/", s.handleCreateDocument)
-		r.Get("/", s.handleListDocuments)
-		r.Get("/{document_id}", s.handleGetDocument)
-		r.Put("/{document_id}/title", s.handleUpdateTitle)
-		r.Delete("/{document_id}", s.handleDeleteDocument)
+		r.Post("/", traceRoute("/documents", s.handleCreateDocument))
+		r.Get("/", traceRoute("/documents", s.handleListDocuments))
+		r.Get("/{document_id}", traceRoute("/documents/{document_id}", s.handleGetDocument))
+		r.Put("/{document_id}/title", traceRoute("/documents/{document_id}/title", s.handleUpdateTitle))
+		r.Delete("/{document_id}", traceRoute("/documents/{document_id}", s.handleDeleteDocument))
 	})
 
 	return r

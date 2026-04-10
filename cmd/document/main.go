@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"doclet/services/document"
+	"doclet/shared/telemetry"
 )
 
 func main() {
@@ -16,6 +17,21 @@ func main() {
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DOCLET_DATABASE_URL is required")
 	}
+
+	shutdownTracing, err := telemetry.Setup(context.Background(), telemetry.Options{
+		DefaultServiceName: "doclet-document",
+		ServiceNameEnvVar:  "DOCLET_DOCUMENT_OTEL_SERVICE_NAME",
+	})
+	if err != nil {
+		log.Fatalf("tracing setup failed: %v", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracing(shutdownCtx); err != nil {
+			log.Printf("tracing shutdown failed: %v", err)
+		}
+	}()
 
 	db, err := document.OpenDatabase(cfg.DatabaseURL)
 	if err != nil {

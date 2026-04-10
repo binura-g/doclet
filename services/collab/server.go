@@ -1,6 +1,7 @@
 package collab
 
 import (
+	"context"
 	"encoding/json"
 	"hash/fnv"
 	"log"
@@ -8,6 +9,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -22,17 +27,21 @@ type Server struct {
 	broker *NatsBroker
 }
 
+var wsTracer = otel.Tracer("doclet/services/collab/ws")
+
 func NewServer(hub *Hub, broker *NatsBroker) *Server {
 	return &Server{hub: hub, broker: broker}
 }
 
 func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/healthz", traceRoute("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
-	mux.HandleFunc("/ws", s.handleWebsocket)
-	return logRequests(mux)
+	}))
+	mux.HandleFunc("/ws", traceRoute("/ws", s.handleWebsocket))
+
+	handler := logRequests(mux)
+	return newTraceMiddleware("collab.http")(handler)
 }
 
 func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
@@ -71,8 +80,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		s.sendUserNameToClient(client, otherID)
 	}
 	s.broadcastUserName(client)
-	client.ReadPump(func(msg Message) {
-		s.handleClientMessage(client, msg)
+	client.ReadPump(r.Context(), func(ctx context.Context, msg Message) {
+		s.handleClientMessage(ctx, client, msg)
 	})
 
 	s.hub.Unregister(client)
@@ -80,27 +89,37 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	log.Printf("client %s left %s", clientID, documentID)
 }
 
-func (s *Server) handleClientMessage(client *Client, msg Message) {
+func (s *Server) handleClientMessage(ctx context.Context, client *Client, msg Message) {
+	ctx, span := wsTracer.Start(ctx, "collab websocket message",
+		trace.WithAttributes(
+			attribute.String("doclet.message.type", msg.Type),
+			attribute.String("doclet.document_id", msg.DocumentID),
+			attribute.String("doclet.client_id", msg.ClientID),
+		),
+	)
+	defer span.End()
+
 	switch msg.Type {
 	case messageUpdate:
 		if payload := mustMarshal(msg); payload != nil {
 			s.hub.Broadcast(msg.DocumentID, payload, msg.ClientID)
 		}
 		if s.broker != nil {
-			s.broker.Publish(SubjectForDocument(msg.DocumentID, "updates"), msg)
+			s.broker.Publish(ctx, SubjectForDocument(msg.DocumentID, "updates"), msg)
 		}
 	case messagePresence:
 		if payload := mustMarshal(msg); payload != nil {
 			s.hub.Broadcast(msg.DocumentID, payload, msg.ClientID)
 		}
 		if s.broker != nil {
-			s.broker.Publish(SubjectForDocument(msg.DocumentID, "presence"), msg)
+			s.broker.Publish(ctx, SubjectForDocument(msg.DocumentID, "presence"), msg)
 		}
 	case messageSnapshot:
 		if s.broker != nil {
-			s.broker.Publish(SubjectForDocument(msg.DocumentID, "snapshots"), msg)
+			s.broker.Publish(ctx, SubjectForDocument(msg.DocumentID, "snapshots"), msg)
 		}
 	default:
+		span.SetStatus(codes.Error, "unknown message type")
 		log.Printf("unknown message type: %s", msg.Type)
 	}
 }
@@ -135,7 +154,7 @@ func (s *Server) SubscribeNATS() error {
 		return nil
 	}
 
-	if _, err := s.broker.Subscribe("doclet.documents.*.updates", func(msg Message) {
+	if _, err := s.broker.Subscribe("doclet.documents.*.updates", func(_ context.Context, msg Message) {
 		if payload := mustMarshal(msg); payload != nil {
 			s.hub.Broadcast(msg.DocumentID, payload, msg.ClientID)
 		}
@@ -143,7 +162,7 @@ func (s *Server) SubscribeNATS() error {
 		return err
 	}
 
-	if _, err := s.broker.Subscribe("doclet.documents.*.presence", func(msg Message) {
+	if _, err := s.broker.Subscribe("doclet.documents.*.presence", func(_ context.Context, msg Message) {
 		if payload := mustMarshal(msg); payload != nil {
 			s.hub.Broadcast(msg.DocumentID, payload, msg.ClientID)
 		}

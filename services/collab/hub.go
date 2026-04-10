@@ -1,6 +1,7 @@
 package collab
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"sync"
@@ -83,7 +84,7 @@ func (h *Hub) ClientIDs(documentID string) []string {
 	return ids
 }
 
-func (c *Client) ReadPump(handle func(Message)) {
+func (c *Client) ReadPump(ctx context.Context, handle func(context.Context, Message)) {
 	defer func() {
 		c.conn.Close()
 	}()
@@ -106,7 +107,7 @@ func (c *Client) ReadPump(handle func(Message)) {
 		}
 		msg.DocumentID = c.documentID
 		msg.ClientID = c.clientID
-		handle(msg)
+		handle(ctx, msg)
 	}
 }
 

@@ -4,6 +4,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY services ./services
+COPY shared ./shared
 RUN CGO_ENABLED=0 go build -o /out/collab ./cmd/collab
 
 FROM alpine:3.19

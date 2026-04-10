@@ -29,6 +29,16 @@ cp .env.example .env
 ```
 Edit `.env` as needed. Defaults assume local Postgres + NATS.
 
+To send traces to OpenChoreo, enable tracing and point the exporter at the OpenTelemetry Collector gRPC endpoint from the OpenChoreo docs:
+
+```sh
+DOCLET_OTEL_ENABLED=true
+DOCLET_OTEL_EXPORTER_ENDPOINT=opentelemetry-collector.openchoreo-observability-plane.svc.cluster.local:4317
+DOCLET_OTEL_EXPORTER_INSECURE=true
+```
+
+The services default to distinct names, `doclet-document` and `doclet-collab`, so you usually do not need to override the service name env vars.
+
 ### 3a) Run the Go services with hot reloading
 
 Install `air` (for hot reloading) if not already installed: https://github.com/air-verse/air
@@ -79,3 +89,4 @@ Access the frontend at `http://localhost:5173`
 ## Notes
 - Document schema is code-first (Gorm). Migrations are generated via `go run ./services/document/cmd/atlas`.
 - Snapshots are saved via NATS on a short debounce from the editor.
+- Tracing uses OpenTelemetry OTLP over gRPC, with config exposed via `.env.example` and `docker-compose.yml`.

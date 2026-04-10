@@ -9,10 +9,26 @@ import (
 	"time"
 
 	"doclet/services/collab"
+	"doclet/shared/telemetry"
 )
 
 func main() {
 	cfg := collab.LoadConfig()
+
+	shutdownTracing, err := telemetry.Setup(context.Background(), telemetry.Options{
+		DefaultServiceName: "doclet-collab",
+		ServiceNameEnvVar:  "DOCLET_COLLAB_OTEL_SERVICE_NAME",
+	})
+	if err != nil {
+		log.Fatalf("tracing setup failed: %v", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracing(shutdownCtx); err != nil {
+			log.Printf("tracing shutdown failed: %v", err)
+		}
+	}()
 
 	hub := collab.NewHub()
 	broker, err := collab.NewNatsBroker(cfg.NATSURL)
